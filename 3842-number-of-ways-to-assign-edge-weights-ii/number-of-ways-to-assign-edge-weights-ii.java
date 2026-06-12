@@ -1,40 +1,72 @@
+import java.util.*;
+
 class Solution {
     private static final int MOD = 1_000_000_007;
-    private int LOG;
-    private int[][] up;
-    private int[] depth;
-    private List<Integer>[] adj;
+    private static final int LOG = 17; // 2^17 > 1e5
 
-    private long modPow(long a, long b) {
-        long ans = 1;
+    public int[] assignEdgeWeights(int[][] edges, int[][] queries) {
+        int n = edges.length + 1;
 
-        while (b > 0) {
-            if ((b & 1) == 1) {
-                ans = (ans * a) % MOD;
+        List<Integer>[] graph = new ArrayList[n + 1];
+        for (int i = 0; i <= n; i++) {
+            graph[i] = new ArrayList<>();
+        }
+
+        for (int[] e : edges) {
+            int u = e[0], v = e[1];
+            graph[u].add(v);
+            graph[v].add(u);
+        }
+
+        int[] depth = new int[n + 1];
+        int[][] parent = new int[LOG][n + 1];
+
+        for (int i = 0; i < LOG; i++) {
+            Arrays.fill(parent[i], -1);
+        }
+
+        dfs(1, -1, graph, depth, parent);
+
+        for (int k = 1; k < LOG; k++) {
+            for (int v = 1; v <= n; v++) {
+                if (parent[k - 1][v] != -1) {
+                    parent[k][v] = parent[k - 1][parent[k - 1][v]];
+                }
             }
-            a = (a * a) % MOD;
-            b >>= 1;
+        }
+
+        int[] ans = new int[queries.length];
+
+        for (int i = 0; i < queries.length; i++) {
+            int u = queries[i][0];
+            int v = queries[i][1];
+
+            if (u == v) {
+                ans[i] = 0;
+                continue;
+            }
+
+            int lca = lca(u, v, parent, depth);
+            int dist = depth[u] + depth[v] - 2 * depth[lca];
+
+            ans[i] = modPow(2, dist - 1);
         }
 
         return ans;
     }
 
-    private void dfs(int node, int parent) {
-        up[node][0] = parent;
+    private void dfs(int u, int p, List<Integer>[] graph,
+                     int[] depth, int[][] parent) {
+        parent[0][u] = p;
 
-        for (int j = 1; j < LOG; j++) {
-            up[node][j] = up[up[node][j - 1]][j - 1];
-        }
-
-        for (int neighbour : adj[node]) {
-            if (neighbour == parent) continue;
-
-            depth[neighbour] = depth[node] + 1;
-            dfs(neighbour, node);
+        for (int v : graph[u]) {
+            if (v == p) continue;
+            depth[v] = depth[u] + 1;
+            dfs(v, u, graph, depth, parent);
         }
     }
 
-    private int lca(int u, int v) {
+    private int lca(int u, int v, int[][] parent, int[] depth) {
         if (depth[u] < depth[v]) {
             int temp = u;
             u = v;
@@ -43,65 +75,33 @@ class Solution {
 
         int diff = depth[u] - depth[v];
 
-        for (int j = LOG - 1; j >= 0; j--) {
-            if ((diff & (1 << j)) != 0) {
-                u = up[u][j];
+        for (int k = 0; k < LOG; k++) {
+            if (((diff >> k) & 1) == 1) {
+                u = parent[k][u];
             }
         }
 
         if (u == v) return u;
 
-        for (int j = LOG - 1; j >= 0; j--) {
-            if (up[u][j] != up[v][j]) {
-                u = up[u][j];
-                v = up[v][j];
+        for (int k = LOG - 1; k >= 0; k--) {
+            if (parent[k][u] != parent[k][v]) {
+                u = parent[k][u];
+                v = parent[k][v];
             }
         }
 
-        return up[u][0];
+        return parent[0][u];
     }
 
-    public int[] assignEdgeWeights(int[][] edges, int[][] queries) {
-        int n = edges.length + 1;
-
-        LOG = 1;
-        while ((1 << LOG) <= n) LOG++;
-
-        adj = new ArrayList[n + 1];
-        for (int i = 0; i <= n; i++) {
-            adj[i] = new ArrayList<>();
-        }
-
-        for (int[] edge : edges) {
-            int u = edge[0];
-            int v = edge[1];
-
-            adj[u].add(v);
-            adj[v].add(u);
-        }
-
-        depth = new int[n + 1];
-        up = new int[n + 1][LOG];
-
-        dfs(1, 0);
-
-        int[] ans = new int[queries.length];
-
-        for (int i = 0; i < queries.length; i++) {
-            int u = queries[i][0];
-            int v = queries[i][1];
-
-            int L = lca(u, v);
-
-            long dist = depth[u] + depth[v] - 2L * depth[L];
-
-            if (dist == 0) {
-                ans[i] = 0;
-            } else {
-                ans[i] = (int) modPow(2, dist - 1);
+    private int modPow(long base, int exp) {
+        long res = 1;
+        while (exp > 0) {
+            if ((exp & 1) == 1) {
+                res = (res * base) % MOD;
             }
+            base = (base * base) % MOD;
+            exp >>= 1;
         }
-
-        return ans;
+        return (int) res;
     }
 }
